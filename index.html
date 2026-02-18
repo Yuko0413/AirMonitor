@@ -1,0 +1,2039 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Air Monitor Dashboard</title>
+    <script>
+        // ==========================================
+        // CONFIGURATION
+        // ==========================================
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzynDBZtH7RrNWqaRY_8mERWZ2JvWuKSWTR8-SuR2UwgfZJzz1Fgvsm2wsyUvxIXtlIIA/exec";
+        const API_TOKEN = "air2026tokyo_nkanox0f4k2p2";
+        // NOTE: 本番公開時はトークンの短期ローテーションやGAS側の制限を検討
+        const REFRESH_INTERVAL_MS = 30000; // 30秒
+        // ==========================================
+    </script>
+    <style>
+        /* CSS Variables */
+        :root {
+            --color-bg: #f5f7fa;
+            --color-text: #111827;
+            --color-text-sub: #374151;
+            --color-white: #ffffff;
+            --color-primary: #3182ce;
+            --color-border: #e2e8f0;
+
+            --color-good: #48bb78;
+            --color-caution: #ecc94b;
+            --color-bad: #f56565;
+
+            --color-stale: #e53e3e;
+            --color-stale-bg: #fff5f5;
+
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+
+            --radius-md: 12px;
+            --radius-lg: 16px;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Reset & Base */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.5;
+            font-size: 16px;
+        }
+
+        /* Layout */
+        .container {
+            width: 100%;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 var(--spacing-md);
+            /* Avoid notch on iPhone */
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+
+        /* Header */
+        header {
+            padding: var(--spacing-md) 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .header-meta {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--color-text-sub);
+        }
+
+        .refresh-btn {
+            background: none;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            color: var(--color-primary);
+            cursor: pointer;
+            min-width: 44px;
+            min-height: 44px;
+            /* Touch target */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .refresh-btn:active {
+            background-color: var(--color-border);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            overflow-x: auto;
+            padding-bottom: 2px;
+            /* Scrollbar space check */
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: var(--color-white);
+            border: 1px solid var(--color-border);
+            padding: 10px 0;
+            border-radius: 9999px;
+            /* Pill shape */
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+            cursor: pointer;
+            min-height: 44px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--color-primary);
+            color: var(--color-white);
+            border-color: var(--color-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Banners */
+        .banner {
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            font-size: 0.875rem;
+            display: none;
+            /* Hidden by default */
+            border-left: 4px solid transparent;
+        }
+
+        .banner.error {
+            background-color: #fff5f5;
+            color: #c53030;
+            border-left-color: #c53030;
+        }
+
+        .banner.stale {
+            background-color: #fffff0;
+            color: #b7791f;
+            border-left-color: #b7791f;
+        }
+
+        /* Main Visual Cards */
+        .card {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-md);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+        }
+
+        /* PM2.5 Main Display */
+        .pm25-container {
+            text-align: center;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .pm25-label {
+            font-size: 0.875rem;
+            color: var(--color-text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .pm25-value-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .pm25-value {
+            font-size: 4rem;
+            /* Big impact */
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .pm25-unit {
+            font-size: 1rem;
+            color: var(--color-text-sub);
+            font-weight: 500;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--color-white);
+            margin-top: 12px;
+            /* Increased spacing as requested */
+        }
+
+        .badge-good {
+            background-color: var(--color-good);
+        }
+
+        .badge-caution {
+            background-color: var(--color-caution);
+            color: #000;
+        }
+
+        /* Black text for contrast */
+        .badge-bad {
+            background-color: var(--color-bad);
+        }
+
+        /* Delta Grid */
+        .delta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            background: var(--color-bg);
+            padding: var(--spacing-md);
+            border-radius: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+        }
+
+        .delta-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .delta-label {
+            font-size: 0.75rem;
+            color: var(--color-text-sub);
+            margin-bottom: 2px;
+        }
+
+        .delta-val {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .delta-unit {
+            font-size: 0.7rem;
+            color: var(--color-text-sub);
+            margin-top: 2px;
+            font-weight: 400;
+        }
+
+        .arrow-up {
+            color: var(--color-bad);
+        }
+
+        /* Rising pollution is bad */
+        .arrow-down {
+            color: var(--color-good);
+        }
+
+        /* Falling pollution is good */
+
+        /* Text Colors */
+        .text-good {
+            color: var(--color-good);
+        }
+
+        .text-bad {
+            color: var(--color-bad);
+        }
+
+        .text-flat {
+            color: var(--color-text-sub);
+        }
+
+        /* Card Background Variants - Subtle (Applied to main-visual-area) */
+        .bg-good {
+            background-color: #f8fff9;
+            border-bottom: 1px solid #dfffe5;
+        }
+
+        .bg-caution {
+            background-color: #fffff8;
+            border-bottom: 1px solid #fffee0;
+        }
+
+        .bg-bad {
+            background-color: #fffafa;
+            border-bottom: 1px solid #ffebeb;
+        }
+
+        .main-visual-area {
+            /* Negative margins to fill the card top */
+            margin: calc(var(--spacing-lg) * -1);
+            margin-bottom: var(--spacing-md);
+            padding: 24px var(--spacing-lg) 12px;
+            border-bottom: 1px solid var(--color-border);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            transition: background-color 0.3s;
+        }
+
+        /* Trend & Outlook */
+        .context-section {
+            /* Removed top border/padding as split is handled by main-visual-area */
+        }
+
+        .trend-label {
+            font-weight: 800;
+            font-size: 1.1rem;
+            margin-right: var(--spacing-sm);
+            color: var(--color-text);
+        }
+
+        .state-tags {
+            display: inline-block;
+            font-size: 0.85rem;
+            color: var(--color-text-sub);
+            background: var(--color-bg);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+
+        .outlook-text {
+            margin-top: var(--spacing-sm);
+            font-size: 0.95rem;
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+
+        /* Sub Cards (Grid) */
+        .sub-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: stretch;
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .sub-card {
+            background: var(--color-white);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+
+            /* Center & Fixed Height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 96px;
+            padding: 14px 12px;
+            text-align: center;
+            gap: 8px;
+            /* Fixed gap between label and value */
+        }
+
+        .sub-label {
+            font-size: 13px;
+            color: var(--color-text-sub);
+            margin: 0;
+            /* Let gap handle spacing */
+            line-height: 1.2;
+        }
+
+        .sub-value {
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            gap: 4px;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .sub-unit {
+            font-size: 0.75em;
+            font-weight: 700;
+            opacity: 0.85;
+        }
+
+        .raw-val {
+            font-size: 0.75rem;
+            color: var(--color-text-sub);
+            margin-top: 4px;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: var(--spacing-lg);
+            padding-bottom: 40px;
+            /* Space for safe area */
+            text-align: center;
+            color: var(--color-text-sub);
+            font-size: 0.8rem;
+        }
+
+        .footer-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px;
+        }
+
+        .toggle-input {
+            appearance: none;
+            width: 40px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 12px;
+            position: relative;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        .toggle-input::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+
+        .toggle-input:checked {
+            background: var(--color-good);
+        }
+
+        .toggle-input:checked::after {
+            transform: translateX(16px);
+        }
+
+        /* View Control */
+        .view-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading Overlay */
+        #loading-indicator {
+            display: none;
+            font-size: 0.8rem;
+            color: var(--color-primary);
+            margin-right: 8px;
+        }
+
+        /* COMPARE TAB STYLES */
+        .chart-container {
+            background: var(--color-white);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            box-shadow: var(--shadow-sm);
+            height: 200px;
+            position: relative;
+        }
+
+        canvas#compare-chart {
+            width: 100%;
+            height: 100%;
+        }
+
+        .compare-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .compare-card {
+            background: var(--color-white);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            /* Added for touch feedback */
+            transition: transform 0.1s;
+        }
+
+        .compare-card:active {
+            transform: scale(0.98);
+        }
+
+        .compare-card.selected {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        .compare-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-sm);
+            border-bottom: 1px solid var(--color-border);
+            padding-bottom: 8px;
+        }
+
+        .compare-time {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--color-text);
+        }
+
+        .compare-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .compare-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .comp-label {
+            font-size: 0.85rem;
+            color: var(--color-text-sub);
+            width: 60px;
+        }
+
+        .comp-val-group {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .comp-main-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            width: 60px;
+            /* aligning */
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .comp-sub-val {
+            font-size: 0.75rem;
+            color: var(--color-text-sub);
+        }
+
+        .comp-delta {
+            font-size: 0.9rem;
+            font-weight: 600;
+            width: 80px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .shape-chip {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            background: var(--color-bg);
+            border-radius: 999px;
+            color: var(--color-text-sub);
+            margin-left: auto;
+        }
+
+        .chart-legend {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            font-size: 0.7rem;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .dot-pm25 {
+            width: 8px;
+            height: 3px;
+            background: #3182ce;
+        }
+
+        .dot-pm10 {
+            width: 8px;
+            height: 1px;
+            background: #a0aec0;
+            border-bottom: 1px dashed #a0aec0;
+        }
+
+        .compare-meta {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--color-border);
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 0.85rem;
+            color: var(--color-text-sub);
+        }
+
+        .flash-focus {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+            transition: outline 0.3s;
+        }
+
+        /* TREND TAB STYLES - ADD */
+        .trend-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            justify-content: center;
+        }
+
+        .period-btn {
+            flex: 1;
+            max-width: 100px;
+            background: var(--color-white);
+            border: 1px solid var(--color-border);
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .period-btn.active {
+            background: var(--color-primary);
+            color: var(--color-white);
+            border-color: var(--color-primary);
+        }
+
+        .metric-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            justify-content: center;
+        }
+
+        .metric-btn {
+            flex: 1;
+            max-width: 120px;
+            background: var(--color-white);
+            border: 1px solid var(--color-border);
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .metric-btn.active {
+            background: var(--color-primary);
+            color: var(--color-white);
+            border-color: var(--color-primary);
+        }
+
+        .trend-summary {
+            text-align: center;
+            padding: 16px;
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+
+        canvas#trend-chart {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>Air Monitor</h1>
+            <div style="display: flex; align-items: center;">
+                <span id="loading-indicator">Updating...</span>
+                <button class="refresh-btn" id="btn-refresh" aria-label="データ更新">
+                    更新
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <nav class="tabs" role="tablist">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-target="view-today">Live</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-target="view-compare">Today</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-target="view-trend">Trend</button>
+        </nav>
+
+        <!-- Banners -->
+        <div id="banner-error" class="banner error"></div>
+        <div id="banner-stale" class="banner stale"></div>
+
+        <!-- Views -->
+        <main>
+            <!-- TODAY VIEW -->
+            <section id="view-today" class="view-section active">
+
+                <!-- Main PM2.5 Card -->
+                <article class="card">
+                    <div id="main-visual-area" class="main-visual-area">
+                        <div class="pm25-container">
+                            <div class="pm25-label">PM2.5 (10m Median)</div>
+                            <div class="pm25-value-wrapper">
+                                <span id="val-pm25" class="pm25-value">--.-</span>
+                                <span class="pm25-unit">µg/m³</span>
+                            </div>
+                            <span id="val-level-badge" class="status-badge" style="display:none;">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Trends -->
+                    <div class="context-section">
+                        <div>
+                            <span class="trend-label" id="val-trend-label">--</span>
+                            <span class="state-tags" id="val-state-tags"></span>
+                        </div>
+                        <p class="outlook-text" id="val-outlook">読み込み中...</p>
+                    </div>
+
+                    <!-- Delta Grid -->
+                    <div class="delta-grid">
+                        <div class="delta-item">
+                            <span class="delta-label">△ 10分前</span>
+                            <span class="delta-val" id="val-delta-10m">--</span>
+                            <span class="delta-unit">PM2.5</span>
+                        </div>
+                        <div class="delta-item">
+                            <span class="delta-label">△ 2時間前</span>
+                            <span class="delta-val" id="val-delta-2h">--</span>
+                            <span class="delta-unit">PM2.5</span>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Sub Grid: Temp & Humidity -->
+                <div class="sub-grid">
+                    <article class="sub-card">
+                        <div class="sub-label">気温</div>
+                        <div class="sub-value">
+                            <span id="val-temp">--</span><span class="sub-unit">℃</span>
+                        </div>
+                    </article>
+                    <article class="sub-card">
+                        <div class="sub-label">湿度</div>
+                        <div class="sub-value">
+                            <span id="val-hum">--</span><span class="sub-unit">%</span>
+                        </div>
+                    </article>
+                </div>
+
+                <!-- Raw values footer in Today view -->
+                <div style="text-align: center; margin-top: 16px;">
+                    <span class="raw-val" id="val-pm25-raw">Raw PM2.5: --.-</span>
+                </div>
+            </section>
+
+            <!-- COMPARE VIEW -->
+            <section id="view-compare" class="view-section">
+                <!-- Error Banner for Compare -->
+                <div id="compare-error" class="banner error" style="display:none;"></div>
+
+                <div class="chart-container">
+                    <canvas id="compare-chart"></canvas>
+                    <div class="chart-legend">
+                        <div class="legend-item"><span class="dot-pm25"></span>PM2.5</div>
+                        <div class="legend-item"><span class="dot-pm10"></span>PM10</div>
+                    </div>
+                </div>
+
+                <div id="compare-list" class="compare-list">
+                    <!-- Cards will be injected here -->
+                    <div style="text-align:center; padding:20px; color:var(--color-text-sub);">Loading data...</div>
+                </div>
+            </section>
+
+            <!-- TREND VIEW - ADD -->
+            <section id="view-trend" class="view-section">
+                <!-- Period Selector -->
+                <div class="trend-controls">
+                    <button class="period-btn" data-days="7">7日</button>
+                    <button class="period-btn active" data-days="14">14日</button>
+                    <button class="period-btn" data-days="30">30日</button>
+                </div>
+
+                <!-- Error Banner for Trend -->
+                <div id="trend-error" class="banner error" style="display:none;"></div>
+
+                <!-- Metric Toggle -->
+                <div class="metric-toggle">
+                    <button class="metric-btn active" data-metric="pm25">PM2.5</button>
+                    <button class="metric-btn" data-metric="pm10">PM10</button>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="trend-chart"></canvas>
+                </div>
+
+                <!-- Summary -->
+                <div id="trend-summary" class="trend-summary">
+                    <div style="color:var(--color-text-sub);">データを読み込み中...</div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div id="last-updated">Last update: --:--</div>
+            <div class="footer-controls">
+                <span>Auto Refresh</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="toggle-autorefresh" class="toggle-input" checked>
+                    <span id="countdown-timer" style="width: 20px; text-align: right;">30</span>
+                </label>
+            </div>
+            <div style="margin-top: 12px; font-size: 0.7rem; opacity: 0.7;">
+                Data source: GAS ui_today
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // ==========================================
+        // STATE & DOM
+        // ==========================================
+        const state = {
+            lastData: null,
+            lastCompareData: null,
+            selectedCompareIndex: null, // Index for highlighting chart
+            activeCompareSlot: null, // Track last tapped card for double-tap detection
+            timerId: null,
+            countdownId: null,
+            secondsLeft: 30,
+            isUpdating: false,
+            isCompareUpdating: false, // Compare-specific inflight flag
+            compareAbortController: null, // AbortController for Compare fetch
+            // TREND ADD
+            lastTrendData: null,
+            trendDays: 14,
+            trendMetric: 'pm25', // 'pm25' or 'pm10'
+            isTrendUpdating: false,
+            trendAbortController: null,
+
+            trendLoadedOnce: false,
+        };
+
+        const dom = {
+            loading: document.getElementById('loading-indicator'),
+            lastUpdated: document.getElementById('last-updated'),
+            bannerError: document.getElementById('banner-error'),
+            bannerStale: document.getElementById('banner-stale'),
+            // Values
+            pm25: document.getElementById('val-pm25'),
+            pm25Raw: document.getElementById('val-pm25-raw'),
+            levelBadge: document.getElementById('val-level-badge'),
+            trendLabel: document.getElementById('val-trend-label'),
+            stateTags: document.getElementById('val-state-tags'),
+            outlook: document.getElementById('val-outlook'),
+            delta10m: document.getElementById('val-delta-10m'),
+            delta2h: document.getElementById('val-delta-2h'),
+            temp: document.getElementById('val-temp'),
+            hum: document.getElementById('val-hum'),
+            // UI
+            mainVisual: document.getElementById('main-visual-area'),
+            // Controls
+            btnRefresh: document.getElementById('btn-refresh'),
+            toggleAuto: document.getElementById('toggle-autorefresh'),
+            countdown: document.getElementById('countdown-timer'),
+            tabs: document.querySelectorAll('.tab-btn'),
+            views: document.querySelectorAll('.view-section'),
+            // Compare DOM
+            compareList: document.getElementById('compare-list'),
+            compareChart: document.getElementById('compare-chart'),
+            compareError: document.getElementById('compare-error'),
+            compareChartContainer: null, // Will be set after DOM loads
+            // TREND ADD
+            trendChart: document.getElementById('trend-chart'),
+            trendError: document.getElementById('trend-error'),
+            trendSummary: document.getElementById('trend-summary'),
+            periodBtns: null, // Will be set in init
+            metricBtns: null  // Will be set in init
+        };
+
+        // ==========================================
+        // LOGIC
+        // ==========================================
+
+        // Initialize
+        function init() {
+            // Initialize compareChartContainer after DOM is loaded
+            dom.compareChartContainer = document.querySelector('#view-compare .chart-container');
+
+            // Tab switching
+            dom.tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetId = tab.dataset.target;
+                    switchTab(targetId);
+                });
+            });
+
+            // Manual Refresh
+            dom.btnRefresh.addEventListener('click', () => {
+                fetchUiToday();
+                // Only fetch Compare if Compare tab is active
+                const compareTabActive = document.querySelector('.tab-btn[data-target="view-compare"]').classList.contains('active');
+                if (compareTabActive) {
+                    fetchUiCompare1h();
+                }
+                resetAutorefresh();
+            });
+
+            // Auto Refresh Toggle
+            dom.toggleAuto.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    startAutorefresh();
+                } else {
+                    stopAutorefresh();
+                }
+            });
+
+            // Compare Chart Click Handler
+            dom.compareChart.addEventListener('click', onCompareChartClick);
+
+            // Event Delegation for Compare Cards
+            dom.compareList.addEventListener('click', (e) => {
+                const card = e.target.closest('.compare-card');
+                if (card) {
+                    onCompareCardClick(card);
+                }
+            });
+
+            // TREND ADD: Initialize Trend controls
+            dom.periodBtns = document.querySelectorAll('.period-btn');
+            dom.metricBtns = document.querySelectorAll('.metric-btn');
+
+            dom.periodBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const days = parseInt(btn.dataset.days);
+                    if (days !== state.trendDays) {
+                        state.trendDays = days;
+                        dom.periodBtns.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        fetchTrendData();
+                    }
+                });
+            });
+
+            dom.metricBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const metric = btn.dataset.metric;
+                    if (metric !== state.trendMetric) {
+                        state.trendMetric = metric;
+                        dom.metricBtns.forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        if (state.lastTrendData) {
+                            drawTrendChart(state.lastTrendData);
+                        }
+                    }
+                });
+            });
+
+            // Initial Fetch (Today only)
+            fetchUiToday();
+            startAutorefresh();
+        }
+
+        function switchTab(targetId) {
+            console.log(`[Tab Switch] Switching to: ${targetId}`);
+
+            // Update buttons
+            dom.tabs.forEach(t => {
+                if (t.dataset.target === targetId) {
+                    t.classList.add('active');
+                    t.setAttribute('aria-selected', 'true');
+                } else {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                }
+            });
+
+            // Update views
+            dom.views.forEach(v => {
+                if (v.id === targetId) {
+                    v.classList.add('active');
+
+                    // Lazy load Compare data when switching to Compare tab
+                    if (targetId === 'view-compare') {
+                        if (!state.lastCompareData) {
+                            console.log('[Tab Switch] Compare data not loaded, fetching...');
+                            fetchUiCompare1h();
+                        } else {
+                            console.log('[Tab Switch] Compare data already loaded, redrawing chart');
+                            // Use requestAnimationFrame to ensure DOM is updated before drawing
+                            requestAnimationFrame(() => {
+                                drawCompareChart(state.lastCompareData);
+                            });
+                        }
+                    }
+
+                    // TREND ADD: Lazy load Trend data when switching to Trend tab
+                    if (targetId === 'view-trend') {
+                        if (!state.trendLoadedOnce) {
+                            state.trendLoadedOnce = true;
+                            console.log('[Tab Switch] Trend first load, fetching...');
+                            //if (!state.lastTrendData) {
+                            //console.log('[Tab Switch] Trend data not loaded, fetching...');
+                            fetchTrendData();
+                        } else {
+                            console.log('[Tab Switch] Trend data already loaded, redrawing chart');
+                            requestAnimationFrame(() => {
+                                if (state.lastTrendData) drawTrendChart(state.lastTrendData);
+                                //drawTrendChart(state.lastTrendData);
+                            });
+                        }
+                    }
+                } else {
+                    v.classList.remove('active');
+                }
+            });
+        }
+
+        // Data Fetching
+        async function fetchUiToday() {
+            if (state.isUpdating) return;
+            state.isUpdating = true;
+            dom.loading.style.display = 'inline';
+            dom.btnRefresh.disabled = true;
+
+            const url = `${GAS_URL}?action=ui_today&token=${API_TOKEN}`;
+            console.log('[Today Fetch] START:', url);
+
+            try {
+                const res = await fetch(url);
+
+                // Debug: log response details
+                console.log(`[Today Fetch] Response status: ${res.status}, redirected: ${res.redirected}`);
+                if (res.redirected) {
+                    console.log(`[Today Fetch] Redirected to: ${res.url}`);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // Debug: log received keys
+                console.log('[Today Fetch] Received keys:', Object.keys(data));
+
+                // Check for ok:false
+                if (data && data.ok === false) {
+                    throw new Error(data.error || "Server returned ok:false");
+                }
+
+                // Validate essential data
+                if (!data || typeof data !== 'object') {
+                    throw new Error("Invalid response format");
+                }
+
+                // Success
+                renderToday(data);
+                hideError();
+                state.lastData = data;
+                console.log('[Today Fetch] END - Success');
+
+            } catch (err) {
+                console.error("[Today Fetch] ERROR:", err);
+                showError("データの取得に失敗しました。接続を確認してください。<br>" + err.message);
+            } finally {
+                state.isUpdating = false;
+                dom.loading.style.display = 'none';
+                dom.btnRefresh.disabled = false;
+            }
+        }
+
+        // Compare Data Fetching with Inflight Control
+        async function fetchUiCompare1h() {
+            // Inflight control: abort previous request if still running
+            if (state.isCompareUpdating) {
+                console.log('[Compare Fetch] Already fetching, aborting previous request');
+                if (state.compareAbortController) {
+                    state.compareAbortController.abort();
+                }
+            }
+
+            state.isCompareUpdating = true;
+            state.compareAbortController = new AbortController();
+            const signal = state.compareAbortController.signal;
+
+            const url = `${GAS_URL}?action=ui_compare_1h&token=${API_TOKEN}`;
+            console.log('[Compare Fetch] START');
+
+            try {
+                const res = await fetch(url, { signal });
+
+                // Debug: log response status and redirect info
+                console.log(`[Compare Fetch] Response status: ${res.status}, redirected: ${res.redirected}`);
+                if (res.redirected) {
+                    console.log(`[Compare Fetch] Redirected to: ${res.url}`);
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                let data = await res.json();
+
+                // error handling based on API spec
+                if (data.ok === false) {
+                    throw new Error(data.error || "Server returned ok:false");
+                }
+
+                let rows = [];
+                // Packed Format parsing
+                if (data && Array.isArray(data.labels)) {
+                    // keys: labels, pm25_med, pm25_max, pm10_med, pm10_max, d25, d10, shape, tempC_med, humRH_med
+                    const len = data.labels.length;
+                    for (let i = 0; i < len; i++) {
+                        rows.push({
+                            slotLabel: data.labels[i],
+                            pm25_median: data.pm25_med ? data.pm25_med[i] : null,
+                            pm25_max: data.pm25_max ? data.pm25_max[i] : null,
+                            pm10_median: data.pm10_med ? data.pm10_med[i] : null,
+                            pm10_max: data.pm10_max ? data.pm10_max[i] : null,
+                            delta_pm25_med: data.d25 ? data.d25[i] : null,
+                            delta_pm10_med: data.d10 ? data.d10[i] : null,
+                            shape_label: data.shape ? data.shape[i] : null,
+                            temp_median: data.tempC_med ? data.tempC_med[i] : null,
+                            hum_median: data.humRH_med ? data.humRH_med[i] : null
+                        });
+                    }
+                }
+                // Legacy Format (just in case)
+                else if (Array.isArray(data)) {
+                    rows = data;
+                }
+                else if (data && data.rows && Array.isArray(data.rows)) {
+                    rows = data.rows;
+                }
+
+                state.lastCompareData = rows;
+                state.selectedCompareIndex = null; // Reset selection on new data
+
+                // Check if no data was parsed
+                if (rows.length === 0) {
+                    console.warn('[Compare Fetch] No rows parsed. Data format:', data);
+                    console.log('[Compare Fetch] Received keys:', Object.keys(data));
+                    dom.compareError.style.display = 'block';
+                    dom.compareError.innerHTML = "データ形式が想定外、またはデータがありません。";
+                } else {
+                    // Cards: Latest first (Reverse order)
+                    const listRows = [...rows].reverse();
+                    renderCompare(listRows);
+
+                    // Chart: Ascending order (Original)
+                    drawCompareChart(rows);
+
+                    dom.compareError.style.display = 'none';
+                }
+
+                console.log('[Compare Fetch] END - Success');
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    console.log('[Compare Fetch] ABORTED');
+                } else {
+                    console.error("[Compare Fetch] ERROR:", err);
+                    dom.compareError.style.display = 'block';
+                    dom.compareError.innerHTML = "比較データの取得に失敗: " + err.message;
+                }
+            } finally {
+                state.isCompareUpdating = false;
+                state.compareAbortController = null;
+            }
+        }
+
+        // ==============================
+        // utils
+        // ==============================
+        function round1(v) {
+            return v == null ? null : Math.round(v * 10) / 10;
+        }
+
+        // ==========================================
+        // TREND: Fetch + Render + Draw
+        // ==========================================
+        async function fetchTrendData() {
+            // Inflight control: abort previous request if still running
+            if (state.isTrendUpdating) {
+                console.log('[Trend Fetch] Already fetching, aborting previous request');
+                if (state.trendAbortController) state.trendAbortController.abort();
+            }
+
+            state.isTrendUpdating = true;
+            state.trendAbortController = new AbortController();
+            const signal = state.trendAbortController.signal;
+
+            const url = `${GAS_URL}?action=trend_daily_v1&token=${API_TOKEN}&days=${state.trendDays}`;
+            console.log('[Trend Fetch] START:', url);
+
+            try {
+                const res = await fetch(url, { signal });
+
+                console.log(`[Trend Fetch] Response status: ${res.status}, redirected: ${res.redirected}`);
+                if (res.redirected) console.log(`[Trend Fetch] Redirected to: ${res.url}`);
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                console.log('[Trend Fetch] Received keys:', Object.keys(data));
+
+                if (data && data.ok === false) throw new Error(data.error || "Server returned ok:false");
+                if (!data || !Array.isArray(data.day_labels)) throw new Error("Invalid response format (day_labels missing)");
+
+                // ★ 表示用に丸め
+                data.pm25_p90 = data.pm25_p90?.map(round1);
+                data.pm10_p90 = data.pm10_p90?.map(round1);
+                data.pm25_med = data.pm25_med?.map(round1);
+                data.pm10_med = data.pm10_med?.map(round1);
+
+                state.lastTrendData = data;
+
+                dom.trendError.style.display = 'none';
+                renderTrendSummary(data);
+
+                // 描画は “表示されてから” の方が安全（width/height=0回避）
+                requestAnimationFrame(() => drawTrendChart(data));
+
+                console.log('[Trend Fetch] END - Success');
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    console.log('[Trend Fetch] ABORTED');
+                } else {
+                    console.error("[Trend Fetch] ERROR:", err);
+                    dom.trendError.style.display = 'block';
+                    dom.trendError.innerHTML = "トレンドデータの取得に失敗: " + err.message;
+                    dom.trendSummary.innerHTML = `<div style="color:var(--color-text-sub);">取得失敗</div>`;
+                    clearTrendCanvas();
+                }
+            } finally {
+                state.isTrendUpdating = false;
+                state.trendAbortController = null;
+            }
+        }
+
+        function renderTrendSummary(data) {
+            if (!data || !data.day_labels || data.day_labels.length === 0) {
+                dom.trendSummary.innerHTML = '';
+                return;
+            }
+
+            const lastIdx = data.day_labels.length - 1;
+            const lastDate = data.day_labels[lastIdx];
+
+            const pm25Med = data.pm25_med ? data.pm25_med[lastIdx] : null;
+            const pm25P90 = data.pm25_p90 ? data.pm25_p90[lastIdx] : null;
+            const pm10Med = data.pm10_med ? data.pm10_med[lastIdx] : null;
+            const pm10P90 = data.pm10_p90 ? data.pm10_p90[lastIdx] : null;
+
+            let html = `<strong>${lastDate}</strong> / ${data.days || state.trendDays}日<br>`;
+            html += `PM2.5: median ${formatNum(pm25Med, 1)} / p90 ${formatNum(pm25P90, 1)}<br>`;
+            html += `PM10: median ${formatNum(pm10Med, 1)} / p90 ${formatNum(pm10P90, 1)}`;
+
+            dom.trendSummary.innerHTML = html;
+        }
+
+        function clearTrendCanvas() {
+            if (!dom.trendChart) return;
+            const ctx = dom.trendChart.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, dom.trendChart.width, dom.trendChart.height);
+        }
+
+        function drawTrendChart(data) {
+            if (!data || !data.day_labels || data.day_labels.length === 0) return;
+            if (!dom.trendChart) return;
+
+            // 表示されていないと offsetWidth/Height が 0 になりがち
+            if (dom.trendChart.offsetWidth === 0 || dom.trendChart.offsetHeight === 0) {
+                console.log('[Trend Draw] canvas size is 0, skip');
+                return;
+            }
+
+            const ctx = dom.trendChart.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            // HiDPI
+            dom.trendChart.width = dom.trendChart.offsetWidth * 2;
+            dom.trendChart.height = dom.trendChart.offsetHeight * 2;
+            ctx.scale(2, 2);
+
+            const W = dom.trendChart.offsetWidth;
+            const H = dom.trendChart.offsetHeight;
+
+            const labels = data.day_labels;
+            const medians = (state.trendMetric === 'pm25') ? data.pm25_med : data.pm10_med;
+            const p90s = (state.trendMetric === 'pm25') ? data.pm25_p90 : data.pm10_p90;
+
+            // min/max
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+
+            for (let i = 0; i < labels.length; i++) {
+                const m = medians ? medians[i] : null;
+                const p = p90s ? p90s[i] : null;
+                if (Number.isFinite(m)) {
+                    minVal = Math.min(minVal, m);
+                    maxVal = Math.max(maxVal, m);
+                }
+                if (Number.isFinite(p)) {
+                    maxVal = Math.max(maxVal, p);
+                }
+            }
+
+            if (!Number.isFinite(minVal) || !Number.isFinite(maxVal)) {
+                ctx.clearRect(0, 0, W, H);
+                return;
+            }
+
+            minVal = Math.max(0, Math.floor(minVal * 0.9));
+            maxVal = Math.ceil(maxVal * 1.1);
+            if (maxVal === minVal) maxVal = minVal + 10;
+
+            const range = maxVal - minVal;
+
+            const pad = { top: 18, bottom: 28, left: 30, right: 10 };
+            const gw = W - pad.left - pad.right;
+            const gh = H - pad.top - pad.bottom;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const barW = Math.max(4, (gw / labels.length) * 0.55);
+            const xOf = (i) => pad.left + (i + 0.5) * (gw / labels.length);
+            const yOf = (v) => pad.top + gh - ((v - minVal) / range) * gh;
+
+            // Y ticks
+            ctx.fillStyle = '#718096';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'right';
+            const ySteps = 4;
+            for (let i = 0; i <= ySteps; i++) {
+                const v = minVal + (range / ySteps) * i;
+                const y = yOf(v);
+                ctx.fillText(v.toFixed(0), pad.left - 6, y + 3);
+            }
+
+            // bars + whiskers
+            const fill = (state.trendMetric === 'pm25') ? '#3182ce' : '#a0aec0';
+            const stroke = (state.trendMetric === 'pm25') ? '#2c5aa0' : '#718096';
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+
+            for (let i = 0; i < labels.length; i++) {
+                const m = medians ? medians[i] : null;
+                const p = p90s ? p90s[i] : null;
+                if (!Number.isFinite(m)) continue;
+
+                const x = xOf(i);
+                const yM = yOf(m);
+                const yB = yOf(minVal);
+
+                ctx.fillRect(x - barW / 2, yM, barW, yB - yM);
+
+                if (Number.isFinite(p) && p > m) {
+                    const yP = yOf(p);
+                    ctx.beginPath();
+                    ctx.moveTo(x, yM);
+                    ctx.lineTo(x, yP);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(x - 4, yP);
+                    ctx.lineTo(x + 4, yP);
+                    ctx.stroke();
+                }
+            }
+
+            // x labels (thin)
+            ctx.fillStyle = '#718096';
+            ctx.textAlign = 'center';
+            const step = labels.length <= 7 ? 1 : (labels.length <= 14 ? 2 : Math.ceil(labels.length / 7));
+            for (let i = 0; i < labels.length; i++) {
+                if (i % step === 0 || i === labels.length - 1) {
+                    ctx.fillText(labels[i], xOf(i), H - 6);
+                }
+            }
+        }
+
+
+        // Rendering
+        function renderToday(data) {
+            if (!data) {
+                console.warn('[renderToday] No data provided');
+                return;
+            }
+
+            // Update Time - with fallback
+            const timestamp = data.updated_at || data.server_now || new Date().toISOString();
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) {
+                    throw new Error('Invalid date');
+                }
+                dom.lastUpdated.textContent = "Data: " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                checkStale(date);
+            } catch (err) {
+                console.warn('[renderToday] Invalid timestamp:', timestamp);
+                dom.lastUpdated.textContent = "Data: --:--";
+            }
+
+            // PM2.5 - with multiple key candidates
+            const pm25Value = getNum(data, ['pm25_10m_med', 'pm25_med', 'pm25', 'pm25_now']);
+            const pm25Raw = getNum(data, ['pm25_now', 'pm25', 'pm25_10m_med']);
+
+            dom.pm25.textContent = formatNum(pm25Value, 1);
+            dom.pm25Raw.textContent = `Raw: ${formatNum(pm25Raw, 1)}`;
+
+            // Badge - with fallback
+            const airLevel = data.air_level_now || data.air_level || null;
+            updateBadge(airLevel);
+
+            // Deltas - with fallback
+            const delta10m = getNum(data, ['delta_vs_10m_prev', 'delta_10m']);
+            const delta2h = getNum(data, ['delta_vs_2h', 'delta_2h']);
+            updateDelta(dom.delta10m, delta10m);
+            updateDelta(dom.delta2h, delta2h);
+
+            // Trend & Context
+            dom.trendLabel.textContent = data.trend_label_10m || data.trend_label || "---";
+            dom.stateTags.textContent = data.state_tags || "";
+            dom.outlook.textContent = data.outlook_today_B || data.outlook || "情報なし";
+
+            // Sub Cards - with multiple key candidates
+            const temp = getNum(data, ['temp_10m_med', 'tempC_med', 'temp_med', 'temp']);
+            const hum = getNum(data, ['hum_10m_med', 'humRH_med', 'hum_med', 'hum']);
+
+            dom.temp.textContent = formatNum(temp, 1);
+            dom.hum.textContent = formatNum(hum, 0);
+        }
+
+        function updateBadge(level) {
+            // Handle null/undefined level
+            if (!level) {
+                dom.levelBadge.style.display = 'none';
+                dom.mainVisual.classList.remove('bg-good', 'bg-caution', 'bg-bad');
+                return;
+            }
+
+            dom.levelBadge.style.display = 'inline-block';
+            dom.levelBadge.textContent = level;
+            dom.levelBadge.className = 'status-badge'; // reset
+
+            // Card Background (Applied to Visual Area)
+            dom.mainVisual.classList.remove('bg-good', 'bg-caution', 'bg-bad');
+
+            if (level === 'GOOD') {
+                dom.levelBadge.classList.add('badge-good');
+                dom.mainVisual.classList.add('bg-good');
+            }
+            else if (level === 'CAUTION') {
+                dom.levelBadge.classList.add('badge-caution');
+                dom.mainVisual.classList.add('bg-caution');
+            }
+            else if (level === 'BAD') {
+                dom.levelBadge.classList.add('badge-bad');
+                dom.mainVisual.classList.add('bg-bad');
+            }
+            else {
+                dom.levelBadge.style.backgroundColor = '#718096';
+            }
+        }
+
+        function updateDelta(el, val) {
+            if (val === undefined || val === null) {
+                el.textContent = "--";
+                el.className = "delta-val text-flat";
+                return;
+            }
+            const num = parseFloat(val);
+            const formatted = (num > 0 ? "+" : "") + num.toFixed(1);
+
+            let arrow = "→";
+            let colorClass = "text-flat";
+            if (num >= 0.5) {
+                arrow = "↗";
+                colorClass = "text-bad"; // Rising is bad for PM2.5
+            } else if (num <= -0.5) {
+                arrow = "↘";
+                colorClass = "text-good"; // Falling is good
+            }
+
+            el.className = `delta-val ${colorClass}`;
+            el.innerHTML = `${formatted} ${arrow}`;
+        }
+
+        function checkStale(lastUpdateDate) {
+            const now = new Date();
+            const diffMs = now - lastUpdateDate;
+            const diffMins = diffMs / 1000 / 60;
+
+            if (diffMins >= 5) {
+                dom.bannerStale.style.display = 'block';
+                dom.bannerStale.textContent = `データ更新が停止している可能性があります(最終: ${Math.floor(diffMins)} 分前)`;
+            } else {
+                dom.bannerStale.style.display = 'none';
+            }
+        }
+
+        function showError(msg) {
+            dom.bannerError.style.display = 'block';
+            dom.bannerError.innerHTML = msg;
+        }
+
+        function hideError() {
+            dom.bannerError.style.display = 'none';
+        }
+
+        // Helper: Robust number parsing
+        function toFiniteNumber(val) {
+            if (val === null || val === undefined || val === "") return null;
+            const num = Number(val);
+            if (Number.isFinite(num)) return num;
+            return null;
+        }
+
+        function formatNum(val, digits) {
+            const num = toFiniteNumber(val);
+            if (num === null) return "--";
+            return num.toFixed(digits);
+        }
+
+        function formatDelta(val) {
+            const num = toFiniteNumber(val);
+            if (num === null) return "--";
+
+            const s = num > 0 ? "+" : "";
+            const arrow = num >= 0.5 ? "↗" : (num <= -0.5 ? "↘" : "→");
+            return s + num.toFixed(1) + " " + arrow;
+        }
+
+        function getDeltaColor(val) {
+            const num = toFiniteNumber(val);
+            if (num === null) return "text-flat";
+            if (num >= 0.5) return "text-bad";
+            if (num <= -0.5) return "text-good";
+            return "text-flat";
+        }
+
+        // Compare Rendering Logic
+        function renderCompare(rows) {
+            if (!rows || rows.length === 0) {
+                dom.compareList.innerHTML = '<div style="text-align:center; padding:20px;">データがありません</div>';
+                return;
+            }
+
+            let html = '';
+            const totalLen = rows.length;
+
+            rows.forEach((row, i) => {
+                // Correct chart index calculation
+                const chartIndex = (totalLen - 1) - i;
+
+                // Safe Extraction
+                const time = row.slotLabel || row.slotStart_1h || row.slotStart || "--:--";
+                const pm25 = getNum(row, ['pm25_median', 'pm25_med', 'pm25_median_1h']);
+                const pm25max = getNum(row, ['pm25_max']);
+                const pm10 = getNum(row, ['pm10_median', 'pm10_med']);
+                const pm10max = getNum(row, ['pm10_max']);
+
+                const delta25 = getNum(row, ['delta_pm25_med', 'delta_vs_prev']);
+                const delta10 = getNum(row, ['delta_pm10_med']);
+
+                const shape = row.shape_label || row.shape || "";
+
+                // Temperature and Humidity
+                const temp = getNum(row, ['temp_median', 'tempC_med']);
+                const hum = getNum(row, ['hum_median', 'humRH_med']);
+
+                // Check if selected
+                const isSelected = state.selectedCompareIndex === chartIndex;
+                const selectedClass = isSelected ? "selected" : "";
+
+                // Add data-slot for chart click navigation (skip if invalid time)
+                const dataSlotAttr = (time && time !== "--:--") ? `data-slot="${time}"` : "";
+
+                html += `
+                <article class="compare-card ${selectedClass}" data-chart-index="${chartIndex}" ${dataSlotAttr}>
+                    <div class="compare-header">
+                        <span class="compare-time">${time}</span>
+                        ${shape ? `<span class="shape-chip">${shape}</span>` : ''}
+                    </div>
+                    
+                    <!-- PM2.5 Row -->
+                    <div class="compare-row">
+                        <span class="comp-label">PM2.5</span>
+                        <div class="comp-val-group">
+                            <span class="comp-main-val">${formatNum(pm25, 1)}</span>
+                            <span class="comp-sub-val">(max:${formatNum(pm25max, 0)})</span>
+                        </div>
+                        <span class="comp-delta ${getDeltaColor(delta25)}">
+                            ${formatDelta(delta25)}
+                        </span>
+                    </div>
+
+                    <!-- PM10 Row -->
+                    <div class="compare-row">
+                        <span class="comp-label">PM10</span>
+                        <div class="comp-val-group">
+                            <span class="comp-main-val">${formatNum(pm10, 0)}</span>
+                            <span class="comp-sub-val">(max:${formatNum(pm10max, 0)})</span>
+                        </div>
+                        <span class="comp-delta ${getDeltaColor(delta10)}">
+                            ${formatDelta(delta10)}
+                        </span>
+                    </div>
+
+                    <!-- Temperature & Humidity -->
+                    <div class="compare-meta">
+                        <span>気温: ${formatNum(temp, 1)}℃</span>
+                        <span>湿度: ${formatNum(hum, 0)}%</span>
+                    </div>
+                </article>
+                `;
+            });
+            dom.compareList.innerHTML = html;
+        }
+
+        // Card Click Handler - Toggle between selection and scroll to chart
+        function onCompareCardClick(card) {
+            const slot = card.dataset.slot;
+            if (!slot) return;
+
+            // Double-tap detection: if same card clicked again, scroll to chart
+            if (state.activeCompareSlot === slot) {
+                scrollToCompareChart();
+                return;
+            }
+
+            // First tap or different card: update selection
+            state.activeCompareSlot = slot;
+
+            // Find index from slot
+            if (!state.lastCompareData) return;
+
+            let foundIndex = -1;
+            for (let i = 0; i < state.lastCompareData.length; i++) {
+                const row = state.lastCompareData[i];
+                const rowSlot = row.slotLabel || row.slotStart_1h || row.slotStart || "";
+                if (rowSlot === slot) {
+                    foundIndex = i;
+                    break;
+                }
+            }
+
+            if (foundIndex === -1) return;
+
+            // Update selection state
+            state.selectedCompareIndex = foundIndex;
+
+            // Update UI (Classes)
+            const cards = document.querySelectorAll('.compare-card');
+            cards.forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+
+            // Redraw Chart with highlight
+            if (state.lastCompareData) {
+                drawCompareChart(state.lastCompareData);
+            }
+        }
+
+        // Scroll to compare chart container
+        function scrollToCompareChart() {
+            if (!dom.compareChartContainer) return;
+
+            // Scroll to chart
+            dom.compareChartContainer.scrollIntoView({ behavior: "smooth", block: "start" });
+
+            // Optional: add flash effect for visual feedback
+            dom.compareChartContainer.classList.add('flash-focus');
+            setTimeout(() => {
+                dom.compareChartContainer.classList.remove('flash-focus');
+            }, 1000);
+
+            // Keep activeCompareSlot for re-tap capability
+        }
+
+        // Chart Click Handler - Scroll to corresponding card
+        function onCompareChartClick(e) {
+            if (!state.lastCompareData || state.lastCompareData.length === 0) return;
+
+            const canvas = dom.compareChart;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+
+            // Account for canvas scaling (HiDPI)
+            const actualW = canvas.offsetWidth;
+
+            // Padding used in drawing (must match drawCompareChart)
+            const padding = { left: 10, right: 10 };
+            const graphW = actualW - padding.left - padding.right;
+
+            // Clamp to valid range
+            let relX = clickX;
+            if (relX < padding.left) relX = padding.left;
+            if (relX > actualW - padding.right) relX = actualW - padding.right;
+
+            // Calculate closest index
+            const n = state.lastCompareData.length;
+            let closestIndex = 0;
+
+            if (n === 1) {
+                closestIndex = 0;
+            } else {
+                // Find index with minimum distance
+                let minDist = Infinity;
+                for (let i = 0; i < n; i++) {
+                    const xPos = padding.left + (i / (n - 1)) * graphW;
+                    const dist = Math.abs(xPos - relX);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestIndex = i;
+                    }
+                }
+            }
+
+            scrollToCompareCardByIndex(closestIndex);
+        }
+
+        // Scroll to card by index and highlight
+        function scrollToCompareCardByIndex(index) {
+            if (!state.lastCompareData || index < 0 || index >= state.lastCompareData.length) return;
+
+            const row = state.lastCompareData[index];
+            const slotLabel = row.slotLabel || row.slotStart_1h || row.slotStart || "";
+
+            if (!slotLabel || slotLabel === "--:--") return;
+
+            // Find card with matching data-slot
+            const targetCard = document.querySelector(`.compare-card[data-slot="${slotLabel}"]`);
+            if (!targetCard) return;
+
+            // Scroll to card
+            targetCard.scrollIntoView({ behavior: "smooth", block: "start" });
+
+            // Flash highlight
+            targetCard.classList.add('flash-focus');
+            setTimeout(() => {
+                targetCard.classList.remove('flash-focus');
+            }, 1000);
+
+            // Optionally update selection state (to match card click behavior)
+            state.selectedCompareIndex = index;
+            const cards = document.querySelectorAll('.compare-card');
+            cards.forEach(c => c.classList.remove('selected'));
+            targetCard.classList.add('selected');
+
+            // Redraw chart with highlight
+            if (state.lastCompareData) {
+                drawCompareChart(state.lastCompareData);
+            }
+        }
+
+        function drawCompareChart(rows) {
+            if (!rows || rows.length === 0) return;
+            // Prevent width=0 issue if called too early
+            if (dom.compareChart.offsetWidth === 0) return;
+
+            const ctx = dom.compareChart.getContext('2d');
+
+            // Reset transforms to prevent multiple scales
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            const w = dom.compareChart.width = dom.compareChart.offsetWidth * 2; // HiDPI
+            const h = dom.compareChart.height = dom.compareChart.offsetHeight * 2;
+            ctx.scale(2, 2);
+            const actualW = dom.compareChart.offsetWidth;
+            const actualH = dom.compareChart.offsetHeight;
+
+            // Extract Data & Calculate Min/Max for Scaling
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+            let hasValidData = false;
+
+            const dataPts = rows.map(r => {
+                const pm25 = getNum(r, ['pm25_median', 'pm25_med', 'pm25']);
+                const pm10 = getNum(r, ['pm10_median', 'pm10_med', 'pm10']);
+
+                if (pm25 !== null) {
+                    if (pm25 < minVal) minVal = pm25;
+                    if (pm25 > maxVal) maxVal = pm25;
+                    hasValidData = true;
+                }
+                if (pm10 !== null) {
+                    if (pm10 < minVal) minVal = pm10;
+                    if (pm10 > maxVal) maxVal = pm10;
+                    hasValidData = true;
+                }
+
+                return {
+                    label: r.slotLabel || "",
+                    pm25: pm25,
+                    pm10: pm10
+                };
+            });
+
+            // If no valid data, clear and return
+            if (!hasValidData) {
+                ctx.clearRect(0, 0, actualW, actualH);
+                return;
+            }
+
+            // If Single point or flat line
+            if (maxVal === -Infinity) {
+                minVal = 0;
+                maxVal = 50;
+            } else if (minVal === maxVal) {
+                minVal = Math.max(0, minVal - 10);
+                maxVal = maxVal + 10;
+            }
+
+            // Add padding (approx 15%)
+            const range = maxVal - minVal;
+            const paddingVal = Math.max(2, range * 0.15);
+            const scaleMin = Math.max(0, Math.floor(minVal - paddingVal));
+            const scaleMax = Math.ceil(maxVal + paddingVal);
+            const scaleRange = scaleMax - scaleMin;
+
+            const padding = { top: 20, bottom: 20, left: 10, right: 10 };
+            const graphW = actualW - padding.left - padding.right;
+            const graphH = actualH - padding.top - padding.bottom;
+
+            // Clear
+            ctx.clearRect(0, 0, actualW, actualH);
+
+            // Don't draw if range is 0 to avoid Infinity
+            if (scaleRange <= 0) return;
+
+            // Helper line
+            const getX = (i) => padding.left + (i / (dataPts.length - 1)) * graphW;
+            const getY = (val) => padding.top + graphH - ((val - scaleMin) / scaleRange) * graphH;
+
+            // Draw Lines function
+            const drawLine = (key, color, dash) => {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = key === 'pm25' ? 3 : 1;
+                ctx.setLineDash(dash);
+
+                let firstInfo = true;
+                dataPts.forEach((p, i) => {
+                    const val = p[key];
+                    if (val === null) return; // Skip missing points or handle gaps
+
+                    const x = getX(i);
+                    const y = getY(val);
+                    if (firstInfo) {
+                        ctx.moveTo(x, y);
+                        firstInfo = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+            };
+
+            // PM10 (Thin, Grey, Dotted)
+            drawLine('pm10', '#a0aec0', [4, 4]);
+
+            // PM2.5 (Thick, Blue, Solid)
+            drawLine('pm25', '#3182ce', []);
+
+            // Labels (time)
+            ctx.fillStyle = '#718096';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.setLineDash([]);
+            const step = Math.max(1, Math.ceil(dataPts.length / 6));
+
+            dataPts.forEach((p, i) => {
+                if (i % step === 0 || i === dataPts.length - 1) {
+                    const x = getX(i);
+                    ctx.fillText(p.label, x, actualH - 5);
+                }
+            });
+
+            // HIGHLIGHT SELECTION logic
+            if (state.selectedCompareIndex !== null && state.selectedCompareIndex >= 0 && state.selectedCompareIndex < dataPts.length) {
+                const idx = state.selectedCompareIndex;
+                const p = dataPts[idx];
+                const x = getX(idx);
+
+                // Draw Vertical Guide Line
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, actualH - padding.bottom);
+                ctx.strokeStyle = "rgba(49,130,206,0.3)";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]); // cleanup
+
+                // Draw Dots
+                const drawDot = (val, color) => {
+                    if (val === null) return;
+                    const y = getY(val);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = "#fff";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                };
+
+                drawDot(p.pm10, '#a0aec0');
+                drawDot(p.pm25, '#3182ce');
+            }
+        }
+
+        // Helpers for key variations
+        function getNum(obj, keys) {
+            for (let k of keys) {
+                if (obj[k] !== undefined && obj[k] !== null) {
+                    return toFiniteNumber(obj[k]);
+                }
+            }
+            return null;
+        }
+
+        // Auto Refresh Logic
+        function startAutorefresh() {
+            stopAutorefresh(); // Clear existing
+            state.secondsLeft = REFRESH_INTERVAL_MS / 1000;
+            updateCountdown();
+
+            state.countdownId = setInterval(() => {
+                state.secondsLeft--;
+                if (state.secondsLeft <= 0) {
+                    // Always refresh Today
+                    fetchUiToday();
+
+                    // Only refresh Compare if Compare tab is active
+                    const compareTabActive = document.querySelector('.tab-btn[data-target="view-compare"]').classList.contains('active');
+                    if (compareTabActive) {
+                        console.log('[Auto Refresh] Compare tab active, refreshing Compare data');
+                        fetchUiCompare1h();
+                    } else {
+                        console.log('[Auto Refresh] Compare tab not active, skipping Compare refresh');
+                    }
+
+                    state.secondsLeft = REFRESH_INTERVAL_MS / 1000;
+                }
+                updateCountdown();
+            }, 1000);
+        }
+
+        function stopAutorefresh() {
+            if (state.countdownId) clearInterval(state.countdownId);
+            state.countdownId = null;
+            dom.countdown.textContent = "--";
+        }
+
+        function resetAutorefresh() {
+            if (dom.toggleAuto.checked) {
+                startAutorefresh();
+            }
+        }
+
+        function updateCountdown() {
+            dom.countdown.textContent = state.secondsLeft;
+        }
+
+        // Start
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+
+</html>
