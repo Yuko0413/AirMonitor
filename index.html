@@ -13,9 +13,35 @@
         const API_TOKEN = "airmon_7f3c9d2e4a8b1c6d9e0f2a7b3c4d5e6f";
         // 本番公開時はトークンの短期ローテーションやGAS側の制限を検討
         const REFRESH_INTERVAL_MS = 30000; // 30秒
+
+        // [AG EDIT] Cat Facts Data
+        const CAT_FACTS = [
+            "猫は1日の多くを寝て過ごすよ（だいたい14〜16時間くらい）。",
+            "猫は肉球にだけ汗をかくよ。",
+            "猫の鼻の模様は一匹ずつ違うと言われているよ。",
+            "猫は自分の脚の長さの何倍もの高さまでジャンプできるよ。",
+            "猫のゴロゴロ音はリラックスしているサインのことが多いよ。",
+            "猫は暗い場所でも人よりよく見えるよ。",
+            "猫は起きている時間のかなりを毛づくろいに使うよ。",
+            "猫は耳を動かして気分を伝えているよ。",
+            "猫はヒゲで周りの距離感を測っているよ。",
+            "猫は高いところにいると安心しやすいよ。",
+            "猫は短距離ならとても速く走れるよ。",
+            "猫の心拍数は人間よりかなり速いよ。",
+            "猫は人の声のトーンを聞き分けていると言われているよ。",
+            "猫は狭いところに入るのが好きなことが多いよ。",
+            "猫は寝ているときに夢を見ることがあるよ。",
+            "猫は音にとても敏感な動物だよ。",
+            "猫は体をすりつけて自分の匂いをつけることがあるよ。",
+            "猫の耳には人間よりずっと多くの筋肉があるよ。",
+            "猫は暗闇でもわずかな光で周囲を認識できるよ。",
+            "猫は気分によって甘えたり距離をとったりするよ。"
+        ];
+
         // ==========================================
     </script>
-        <!-- Google tag (gtag.js) -->
+
+    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BTRPLFJPM4"></script>
     <script> window.dataLayer = window.dataLayer || []; function gtag() { dataLayer.push(arguments); } gtag('js', new Date()); gtag('config', 'G-BTRPLFJPM4'); </script>
     <style>
@@ -758,6 +784,102 @@
                 content: '';
             }
         }
+
+        /* Loading - Cat Facts */
+        .loading-cat-fact {
+            font-size: 0.8rem;
+            color: var(--color-text-sub);
+            margin-top: 8px;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        /* TREND VIEW REFINEMENT */
+        .trend-detail-card {
+            background: var(--color-white);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-top: 16px;
+            box-shadow: var(--shadow-sm);
+            border-left: 4px solid var(--color-primary);
+            /* Accent */
+            animation: fadeIn 0.3s ease;
+        }
+
+        .trend-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        .trend-detail-date {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .trend-detail-tag {
+            font-size: 0.8rem;
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--color-text-sub);
+        }
+
+        .trend-detail-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .trend-metric-box {
+            text-align: center;
+        }
+
+        .trend-metric-label {
+            font-size: 0.75rem;
+            color: var(--color-text-sub);
+        }
+
+        .trend-metric-val {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--color-primary);
+        }
+
+        .trend-metric-sub {
+            font-size: 0.7rem;
+            color: #718096;
+        }
+
+        .trend-list {
+            margin-top: 20px;
+            padding-bottom: 80px;
+        }
+
+        .trend-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fff;
+            margin-bottom: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.2s, background-color 0.2s;
+        }
+
+        .trend-list-item:active {
+            transform: scale(0.98);
+        }
+
+        .trend-list-item.selected {
+            border-color: var(--color-primary);
+            background-color: #ebf8ff;
+            /* Light blue tint */
+            box-shadow: 0 0 0 1px var(--color-primary);
+        }
     </style>
 </head>
 
@@ -864,7 +986,9 @@
 
                 <div id="compare-list" class="compare-list">
                     <!-- Cards will be injected here -->
-                    <div style="text-align:center; padding:20px; color:var(--color-text-sub);">Loading data<span class="dots"></span><br>少し待ってにゃん😿</br></div>
+                    <div style="text-align:center; padding:20px; color:var(--color-text-sub);">Loading
+                        data<span class="dots"></span><br>少し待ってにゃん😿</br>
+                    </div>
                 </div>
             </section>
 
@@ -891,10 +1015,13 @@
                     <canvas id="trend-chart"></canvas>
                 </div>
 
-                <!-- Summary -->
-                <div id="trend-summary" class="trend-summary">
-                    <div style="color:var(--color-text-sub);">Loading data<span class="dots"></span><br>少し待ってにゃん🙀</br></div>
+                <!-- Detailed Card -->
+                <div id="trend-detail-card" class="trend-detail-card">
+                    <div style="color:var(--color-text-sub); text-align:center;">Loading details...</div>
                 </div>
+
+                <!-- [AG EDIT] Daily Cards -->
+                <div id="trend-list" class="trend-list" style="margin-top: 20px; padding-bottom: 80px;"></div>
             </section>
         </main>
 
@@ -915,6 +1042,8 @@
     </div>
 
     <script>
+
+
         // ==========================================
         // STATE & DOM
         // ==========================================
@@ -937,6 +1066,13 @@
             trendAbortController: null,
 
             trendLoadedOnce: false,
+
+            // [AG EDIT] Cache for optimization
+            lastTrendData30: null, // Cache 30 days data
+            trendCacheTimestamp: 0, // For TTL
+
+            // [AG EDIT] Trend Interaction
+            trendSelectedIndex: null // Index of day_labels
         };
 
         const dom = {
@@ -971,7 +1107,8 @@
             // TREND ADD
             trendChart: document.getElementById('trend-chart'),
             trendError: document.getElementById('trend-error'),
-            trendSummary: document.getElementById('trend-summary'),
+            trendDetailCard: document.getElementById('trend-detail-card'), // [AG EDIT] Changed from summary
+            trendList: document.getElementById('trend-list'), // [AG EDIT]
             periodBtns: null, // Will be set in init
             metricBtns: null  // Will be set in init
         };
@@ -979,6 +1116,13 @@
         // ==========================================
         // LOGIC
         // ==========================================
+
+        // [AG EDIT] Cat Facts
+        function getRandomCatFact() {
+            if (!CAT_FACTS || CAT_FACTS.length === 0) return "";
+            const idx = Math.floor(Math.random() * CAT_FACTS.length);
+            return CAT_FACTS[idx];
+        }
 
         // Initialize
         function init() {
@@ -1024,6 +1168,32 @@
                 }
             });
 
+            // [AG EDIT] Trend Chart Click (Interactive)
+            if (dom.trendChart) {
+                dom.trendChart.addEventListener('click', (e) => {
+                    if (!state.lastTrendData || !state.lastTrendData.day_labels) return;
+
+                    const rect = dom.trendChart.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const W = dom.trendChart.offsetWidth;
+
+                    const pad = { top: 18, bottom: 28, left: 30, right: 10 };
+                    const gw = W - pad.left - pad.right;
+                    const labels = state.lastTrendData.day_labels;
+                    const len = labels.length;
+
+                    if (x < pad.left || x > W - pad.right) return;
+
+                    const chartX = x - pad.left;
+                    const step = gw / len;
+                    const index = Math.floor(chartX / step);
+
+                    if (index >= 0 && index < len) {
+                        selectTrendDay(index);
+                    }
+                });
+            }
+
             // TREND ADD: Initialize Trend controls
             dom.periodBtns = document.querySelectorAll('.period-btn');
             dom.metricBtns = document.querySelectorAll('.metric-btn');
@@ -1032,10 +1202,10 @@
                 btn.addEventListener('click', () => {
                     const days = parseInt(btn.dataset.days);
                     if (days !== state.trendDays) {
-                        state.trendDays = days;
                         dom.periodBtns.forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
-                        fetchTrendData();
+                        // [AG EDIT] Use optimized function
+                        applyTrendDays(days);
                     }
                 });
             });
@@ -1179,6 +1349,10 @@
             state.compareAbortController = new AbortController();
             const signal = state.compareAbortController.signal;
 
+            // [AG EDIT] Loading with Cat Fact
+            const fact = getRandomCatFact();
+            dom.compareList.innerHTML = `<div style="text-align:center; padding:20px; color:var(--color-text-sub);">Loading data<span class="dots"></span><br>少し待ってにゃん😿</br><div class="loading-cat-fact">${fact}</div></div>`;
+
             const url = `${GAS_URL}?action=ui_compare_1h&token=${API_TOKEN}`;
             console.log('[Compare Fetch] START');
 
@@ -1271,86 +1445,228 @@
         }
 
         // ==========================================
-        // TREND: Fetch + Render + Draw
+        // TREND: Fetch + Render + Draw + Optimization
         // ==========================================
-        async function fetchTrendData() {
-            // Inflight control: abort previous request if still running
-            if (state.isTrendUpdating) {
-                console.log('[Trend Fetch] Already fetching, aborting previous request');
-                if (state.trendAbortController) state.trendAbortController.abort();
-            }
 
+        function applyTrendDays(days) {
+            state.trendDays = days;
+
+            // Check cache (30 days data)
+            // TTL: 60 seconds (60000ms)
+            const now = Date.now();
+            const isCacheValid = state.lastTrendData30 && (now - state.trendCacheTimestamp < 60000);
+
+            if (isCacheValid) {
+                console.log('[Trend] Cache HIT. Slicing data for', days, 'days');
+                const viewData = pickTrendDays(state.lastTrendData30, days);
+                state.lastTrendData = viewData;
+
+                // [AG EDIT] Reset to latest
+                const len = (viewData.day_labels) ? viewData.day_labels.length : 0;
+                state.trendSelectedIndex = (len > 0) ? len - 1 : null;
+                state.lastTrendData = viewData; // Logic uses this for redraw
+
+                dom.trendError.style.display = 'none';
+                renderTrendDetailCard(viewData);
+                renderTrendList(viewData);
+
+                requestAnimationFrame(() => drawTrendChart(viewData));
+            } else {
+                console.log('[Trend] Cache MISS/EXPIRED. Fetching new data...');
+                fetchTrendData();
+            }
+        }
+
+        function pickTrendDays(src, days) {
+            if (!src || !src.day_labels) return src;
+            // Validate days
+            if (days > src.day_labels.length) return src; // Return all if request more than available
+
+            const cut = (arr) => Array.isArray(arr) ? arr.slice(-days) : arr;
+
+            // Clone and slice arrays
+            // Note: primitives like days/ok/updated_at are copied, arrays are sliced
+            return {
+                ...src,
+                days: days, // Override days in object
+                day_labels: cut(src.day_labels),
+                pm25_med: cut(src.pm25_med),
+                pm10_med: cut(src.pm10_med),
+                ratio_med: cut(src.ratio_med),
+                pollen_h: cut(src.pollen_h),
+                pm25_p90: cut(src.pm25_p90),
+                pm10_p90: cut(src.pm10_p90),
+                pm25_max_raw: cut(src.pm25_max_raw),
+                pm10_max_raw: cut(src.pm10_max_raw),
+            };
+        }
+
+        async function fetchTrendData() {
+            if (state.isTrendUpdating) return;
             state.isTrendUpdating = true;
+
+            // Abort previous
+            if (state.trendAbortController) {
+                state.trendAbortController.abort();
+            }
             state.trendAbortController = new AbortController();
             const signal = state.trendAbortController.signal;
 
-            const url = `${GAS_URL}?action=trend_daily_v1&token=${API_TOKEN}&days=${state.trendDays}`;
+            // Always fetch 30 days for cache (unless specific requirement overrides, but here we want optimization)
+            const url = `${GAS_URL}?action=trend_daily_v1&token=${API_TOKEN}&days=30`;
             console.log('[Trend Fetch] START:', url);
+
+            // [AG EDIT] Loading with Cat Fact
+            const fact = getRandomCatFact();
+            dom.trendDetailCard.innerHTML = `<div style="color:var(--color-text-sub); text-align:center;">Loading data<span class="dots"></span><br>少し待ってにゃん🙀</br><div class="loading-cat-fact">${fact}</div></div>`;
+            if (dom.trendList) dom.trendList.innerHTML = ''; // Clear cards
 
             try {
                 const res = await fetch(url, { signal });
-
-                console.log(`[Trend Fetch] Response status: ${res.status}, redirected: ${res.redirected}`);
-                if (res.redirected) console.log(`[Trend Fetch] Redirected to: ${res.url}`);
-
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                if (!res.ok) throw new Error(`Status ${res.status}`);
                 const data = await res.json();
 
-                console.log('[Trend Fetch] Received keys:', Object.keys(data));
+                if (!data.ok) throw new Error("API returned ok:false");
 
-                if (data && data.ok === false) throw new Error(data.error || "Server returned ok:false");
-                if (!data || !Array.isArray(data.day_labels)) throw new Error("Invalid response format (day_labels missing)");
+                // Update Cache
+                state.lastTrendData30 = data;
+                state.trendCacheTimestamp = Date.now();
+                state.trendLoadedOnce = true;
 
-                // ★ 表示用に丸め
-                data.pm25_p90 = data.pm25_p90?.map(round1);
-                data.pm10_p90 = data.pm10_p90?.map(round1);
-                data.pm25_med = data.pm25_med?.map(round1);
-                data.pm10_med = data.pm10_med?.map(round1);
+                // Apply current view setting (slice logic)
+                const days = state.trendDays || 14;
+                const viewData = pickTrendDays(data, days);
+                state.lastTrendData = viewData;
 
-                state.lastTrendData = data;
+                // [AG EDIT] Reset to latest
+                const len = (viewData.day_labels) ? viewData.day_labels.length : 0;
+                state.trendSelectedIndex = (len > 0) ? len - 1 : null;
 
                 dom.trendError.style.display = 'none';
-                renderTrendSummary(data);
+                renderTrendDetailCard(viewData);
+                renderTrendList(viewData);
 
-                // 描画は “表示されてから” の方が安全（width/height=0回避）
-                requestAnimationFrame(() => drawTrendChart(data));
+                requestAnimationFrame(() => drawTrendChart(viewData));
 
-                console.log('[Trend Fetch] END - Success');
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('[Trend Fetch] ABORTED');
-                } else {
-                    console.error("[Trend Fetch] ERROR:", err);
-                    dom.trendError.style.display = 'block';
-                    dom.trendError.innerHTML = "トレンドデータの取得に失敗: " + err.message;
-                    dom.trendSummary.innerHTML = `<div style="color:var(--color-text-sub);">取得失敗</div>`;
-                    clearTrendCanvas();
+                    console.log('[Trend Fetch] Aborted');
+                    return;
                 }
+                console.error('[Trend Fetch] Error:', err);
+                dom.trendError.style.display = 'block';
+                dom.trendError.textContent = "データの取得に失敗しました。";
+                dom.trendDetailCard.innerHTML = '<div style="color:var(--color-bad); text-align:center;">Load Failed</div>';
             } finally {
                 state.isTrendUpdating = false;
                 state.trendAbortController = null;
             }
         }
 
-        function renderTrendSummary(data) {
-            if (!data || !data.day_labels || data.day_labels.length === 0) {
-                dom.trendSummary.innerHTML = '';
+        // [AG EDIT] Selection Logic
+        function selectTrendDay(index) {
+            if (!state.lastTrendData || !state.lastTrendData.day_labels) return;
+            state.trendSelectedIndex = index;
+
+            // 1. Update Detail Card
+            renderTrendDetailCard(state.lastTrendData);
+
+            // 2. Update List Highlight
+            // Remove old
+            const oldSelected = dom.trendList.querySelector('.trend-list-item.selected');
+            if (oldSelected) oldSelected.classList.remove('selected');
+
+            // Add new
+            // List is rendered latest-first, so data-index corresponds to array index
+            const newSelected = dom.trendList.querySelector(`.trend-list-item[data-index="${index}"]`);
+            if (newSelected) {
+                newSelected.classList.add('selected');
+            }
+
+            // 3. Redraw Chart for Highlight
+            requestAnimationFrame(() => drawTrendChart(state.lastTrendData));
+        }
+
+        function renderTrendDetailCard(data) {
+            if (!data || !dom.trendDetailCard) return;
+            // Logic to show selected day details
+            if (!data.day_labels || data.day_labels.length === 0) {
+                dom.trendDetailCard.innerHTML = '<div style="text-align:center; color:var(--color-text-sub);">No Data</div>';
                 return;
             }
 
-            const lastIdx = data.day_labels.length - 1;
-            const lastDate = data.day_labels[lastIdx];
+            const idx = (state.trendSelectedIndex !== null) ? state.trendSelectedIndex : data.day_labels.length - 1;
 
-            const pm25Med = data.pm25_med ? data.pm25_med[lastIdx] : null;
-            const pm25P90 = data.pm25_p90 ? data.pm25_p90[lastIdx] : null;
-            const pm10Med = data.pm10_med ? data.pm10_med[lastIdx] : null;
-            const pm10P90 = data.pm10_p90 ? data.pm10_p90[lastIdx] : null;
+            // Safety check
+            if (idx < 0 || idx >= data.day_labels.length) return;
 
-            let html = `<strong>${lastDate}</strong> / ${data.days || state.trendDays}日<br>`;
-            html += `PM2.5: median ${formatNum(pm25Med, 1)} / p90 ${formatNum(pm25P90, 1)}<br>`;
-            html += `PM10: median ${formatNum(pm10Med, 1)} / p90 ${formatNum(pm10P90, 1)}`;
+            const date = data.day_labels[idx];
+            const p25 = data.pm25_med ? data.pm25_med[idx] : null;
+            const p25p = data.pm25_p90 ? data.pm25_p90[idx] : null;
+            const p10 = data.pm10_med ? data.pm10_med[idx] : null;
+            const p10p = data.pm10_p90 ? data.pm10_p90[idx] : null;
 
-            dom.trendSummary.innerHTML = html;
+            // Delta Calculation
+            let deltaHtml = '';
+            // Check previous day availability
+            if (idx > 0 && data.pm25_med && data.pm25_med[idx - 1] != null && p25 != null) {
+                const prev = data.pm25_med[idx - 1];
+                const d = p25 - prev;
+                const sign = d > 0 ? '+' : '';
+                const color = d > 0 ? 'var(--color-bad)' : 'var(--color-good)';
+                const style = (d === 0) ? 'color:var(--color-text-sub);' : `color:${color};`;
+                deltaHtml = `<span style="${style} font-size:0.9rem; margin-left:8px;">(前日比 ${sign}${formatNum(d, 1)})</span>`;
+            }
+
+            const html = `
+                <div class="trend-detail-header">
+                    <div class="trend-detail-date">${date}${deltaHtml}</div>
+                    <div class="trend-detail-tag">Selection</div>
+                </div>
+                <div class="trend-detail-metrics">
+                    <div class="trend-metric-box">
+                        <div class="trend-metric-label">PM2.5 (Median / p90)</div>
+                        <div class="trend-metric-val">${formatNum(p25, 1)} <span class="trend-metric-sub">/ ${formatNum(p25p, 1)}</span></div>
+                    </div>
+                    <div class="trend-metric-box">
+                        <div class="trend-metric-label">PM10 (Median / p90)</div>
+                        <div class="trend-metric-val" style="color:#718096;">${formatNum(p10, 1)} <span class="trend-metric-sub">/ ${formatNum(p10p, 1)}</span></div>
+                    </div>
+                </div>
+             `;
+            dom.trendDetailCard.innerHTML = html;
+        }
+
+        // Renamed from renderTrendCards or renderTrendList
+        function renderTrendList(data) {
+            if (!data || !dom.trendList) return;
+            const labels = data.day_labels || [];
+            if (labels.length === 0) {
+                dom.trendList.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            // Render Latest First
+            for (let i = labels.length - 1; i >= 0; i--) {
+                const date = labels[i];
+                const pm25 = data.pm25_med ? data.pm25_med[i] : null;
+                const pm25p = data.pm25_p90 ? data.pm25_p90[i] : null;
+                const tag = ""; // Placeholder for now
+
+                const isSelected = (i === state.trendSelectedIndex) ? 'selected' : '';
+
+                html += `
+                 <div class="trend-list-item ${isSelected}" data-index="${i}" onclick="selectTrendDay(${i})">
+                     <div style="font-weight:bold; width:60px; color:var(--color-text);">${date}</div>
+                     <div style="flex:1; text-align:center;">${tag}</div>
+                     <div style="text-align:right;">
+                         <span style="font-weight:bold; color:var(--color-primary); font-size:1.1rem;">${formatNum(pm25, 1)}</span>
+                         <span style="color:var(--color-text-sub); font-size:0.85rem;"> (p90 ${formatNum(pm25p, 1)})</span>
+                     </div>
+                 </div>`;
+            }
+            dom.trendList.innerHTML = html;
         }
 
         function clearTrendCanvas() {
@@ -1359,6 +1675,7 @@
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, dom.trendChart.width, dom.trendChart.height);
         }
+
 
         function drawTrendChart(data) {
             if (!data || !data.day_labels || data.day_labels.length === 0) return;
@@ -1371,15 +1688,16 @@
             }
 
             const ctx = dom.trendChart.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const rect = dom.trendChart.getBoundingClientRect();
+
+            dom.trendChart.width = rect.width * dpr;
+            dom.trendChart.height = rect.height * dpr;
             ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
 
-            // HiDPI
-            dom.trendChart.width = dom.trendChart.offsetWidth * 2;
-            dom.trendChart.height = dom.trendChart.offsetHeight * 2;
-            ctx.scale(2, 2);
-
-            const W = dom.trendChart.offsetWidth;
-            const H = dom.trendChart.offsetHeight;
+            const W = rect.width;
+            const H = rect.height;
 
             const labels = data.day_labels;
             const medians = (state.trendMetric === 'pm25') ? data.pm25_med : data.pm10_med;
@@ -1407,78 +1725,229 @@
             }
 
             minVal = Math.max(0, Math.floor(minVal * 0.9));
+            if (maxVal < 10) maxVal = 10;
             maxVal = Math.ceil(maxVal * 1.1);
             if (maxVal === minVal) maxVal = minVal + 10;
 
             const range = maxVal - minVal;
 
-            const pad = { top: 18, bottom: 28, left: 30, right: 10 };
+            const pad = { top: 20, bottom: 30, left: 35, right: 10 };
             const gw = W - pad.left - pad.right;
             const gh = H - pad.top - pad.bottom;
 
             ctx.clearRect(0, 0, W, H);
 
-            const barW = Math.max(4, (gw / labels.length) * 0.55);
-            const xOf = (i) => pad.left + (i + 0.5) * (gw / labels.length);
+            // Grid / Ticks
+            const ySteps = 4;
             const yOf = (v) => pad.top + gh - ((v - minVal) / range) * gh;
 
-            // Y ticks
-            ctx.fillStyle = '#718096';
-            ctx.font = '10px sans-serif';
+            ctx.lineWidth = 1;
             ctx.textAlign = 'right';
-            const ySteps = 4;
+            ctx.textBaseline = 'middle';
+            ctx.font = '10px sans-serif';
+
             for (let i = 0; i <= ySteps; i++) {
                 const v = minVal + (range / ySteps) * i;
                 const y = yOf(v);
-                ctx.fillText(v.toFixed(0), pad.left - 6, y + 3);
+
+                // Grid line
+                ctx.beginPath();
+                ctx.strokeStyle = '#edf2f7';
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(W - pad.right, y);
+                ctx.stroke();
+
+                // Text
+                ctx.fillStyle = '#718096';
+                ctx.fillText(v.toFixed(0), pad.left - 6, y);
+            }
+
+            // Selection Highlight (Behind Bars)
+            const step = gw / labels.length;
+            const xOfCenter = (i) => pad.left + (i + 0.5) * step;
+
+            if (state.trendSelectedIndex !== null) {
+                const i = state.trendSelectedIndex;
+                if (i >= 0 && i < labels.length) {
+                    const cx = xOfCenter(i);
+                    ctx.fillStyle = 'rgba(66, 153, 225, 0.15)'; // Blue tint
+                    ctx.fillRect(cx - step / 2, pad.top, step, gh);
+                }
             }
 
             // bars + whiskers
+            const barW = Math.max(4, step * 0.6);
+
             const fill = (state.trendMetric === 'pm25') ? '#3182ce' : '#a0aec0';
             const stroke = (state.trendMetric === 'pm25') ? '#2c5aa0' : '#718096';
-            ctx.fillStyle = fill;
-            ctx.strokeStyle = stroke;
-            ctx.lineWidth = 2;
 
             for (let i = 0; i < labels.length; i++) {
                 const m = medians ? medians[i] : null;
                 const p = p90s ? p90s[i] : null;
                 if (!Number.isFinite(m)) continue;
 
-                const x = xOf(i);
+                const cx = xOfCenter(i);
                 const yM = yOf(m);
                 const yB = yOf(minVal);
 
-                ctx.fillRect(x - barW / 2, yM, barW, yB - yM);
+                // Bar
+                ctx.fillStyle = (i === state.trendSelectedIndex) ? ((state.trendMetric === 'pm25') ? '#2b6cb0' : '#718096') : fill;
+                ctx.fillRect(cx - barW / 2, yM, barW, yB - yM);
 
+                // Whisker (p90)
                 if (Number.isFinite(p) && p > m) {
                     const yP = yOf(p);
+                    ctx.strokeStyle = stroke;
+                    ctx.lineWidth = 1;
+
                     ctx.beginPath();
-                    ctx.moveTo(x, yM);
-                    ctx.lineTo(x, yP);
+                    ctx.moveTo(cx, yM);
+                    ctx.lineTo(cx, yP);
                     ctx.stroke();
 
                     ctx.beginPath();
-                    ctx.moveTo(x - 4, yP);
-                    ctx.lineTo(x + 4, yP);
+                    ctx.moveTo(cx - 3, yP);
+                    ctx.lineTo(cx + 3, yP);
                     ctx.stroke();
                 }
             }
 
-            // x labels (thin)
+            // x labels (Date)
             ctx.fillStyle = '#718096';
             ctx.textAlign = 'center';
-            const step = labels.length <= 7 ? 1 : (labels.length <= 14 ? 2 : Math.ceil(labels.length / 7));
+            ctx.textBaseline = 'top';
+
+            // Thin out labels
+            let skip = 1;
+            if (labels.length > 20) skip = 5;
+            else if (labels.length > 10) skip = 2; // e.g. 14 days -> every 2nd
+
             for (let i = 0; i < labels.length; i++) {
-                if (i % step === 0 || i === labels.length - 1) {
-                    ctx.fillText(labels[i], xOf(i), H - 6);
+                if (i % skip === 0) {
+                    // Remove Year "YYYY-"
+                    const txt = labels[i].slice(5);
+                    ctx.fillText(txt, xOfCenter(i), pad.top + gh + 6);
                 }
             }
+        }
+        /* if (!data || !data.day_labels || data.day_labels.length === 0) return;
+        if (!dom.trendChart) return;
+
+        // 表示されていないと offsetWidth/Height が 0 になりがち
+        if (dom.trendChart.offsetWidth === 0 || dom.trendChart.offsetHeight === 0) {
+            console.log('[Trend Draw] canvas size is 0, skip');
+            return;
+        }
+
+        const ctx = dom.trendChart.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        // HiDPI
+        dom.trendChart.width = dom.trendChart.offsetWidth * 2;
+        dom.trendChart.height = dom.trendChart.offsetHeight * 2;
+        ctx.scale(2, 2);
+
+        const W = dom.trendChart.offsetWidth;
+        const H = dom.trendChart.offsetHeight;
+
+        const labels = data.day_labels;
+        const medians = (state.trendMetric === 'pm25') ? data.pm25_med : data.pm10_med;
+        const p90s = (state.trendMetric === 'pm25') ? data.pm25_p90 : data.pm10_p90;
+
+        // min/max
+        let minVal = Infinity;
+        let maxVal = -Infinity;
+
+        for (let i = 0; i < labels.length; i++) {
+            const m = medians ? medians[i] : null;
+            const p = p90s ? p90s[i] : null;
+            if (Number.isFinite(m)) {
+                minVal = Math.min(minVal, m);
+                maxVal = Math.max(maxVal, m);
+            }
+            if (Number.isFinite(p)) {
+                maxVal = Math.max(maxVal, p);
+            }
+        }
+
+        if (!Number.isFinite(minVal) || !Number.isFinite(maxVal)) {
+            ctx.clearRect(0, 0, W, H);
+            return;
+        }
+
+        minVal = Math.max(0, Math.floor(minVal * 0.9));
+        maxVal = Math.ceil(maxVal * 1.1);
+        if (maxVal === minVal) maxVal = minVal + 10;
+
+        const range = maxVal - minVal;
+
+        const pad = { top: 18, bottom: 28, left: 30, right: 10 };
+        const gw = W - pad.left - pad.right;
+        const gh = H - pad.top - pad.bottom;
+
+        ctx.clearRect(0, 0, W, H);
+
+        const barW = Math.max(4, (gw / labels.length) * 0.55);
+        const xOf = (i) => pad.left + (i + 0.5) * (gw / labels.length);
+        const yOf = (v) => pad.top + gh - ((v - minVal) / range) * gh;
+
+        // Y ticks
+        ctx.fillStyle = '#718096';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        const ySteps = 4;
+        for (let i = 0; i <= ySteps; i++) {
+            const v = minVal + (range / ySteps) * i;
+            const y = yOf(v);
+            ctx.fillText(v.toFixed(0), pad.left - 6, y + 3);
+        }
+
+        // bars + whiskers
+        const fill = (state.trendMetric === 'pm25') ? '#3182ce' : '#a0aec0';
+        const stroke = (state.trendMetric === 'pm25') ? '#2c5aa0' : '#718096';
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 2;
+
+        for (let i = 0; i < labels.length; i++) {
+            const m = medians ? medians[i] : null;
+            const p = p90s ? p90s[i] : null;
+            if (!Number.isFinite(m)) continue;
+
+            const x = xOf(i);
+            const yM = yOf(m);
+            const yB = yOf(minVal);
+
+            ctx.fillRect(x - barW / 2, yM, barW, yB - yM);
+
+            if (Number.isFinite(p) && p > m) {
+                const yP = yOf(p);
+                ctx.beginPath();
+                ctx.moveTo(x, yM);
+                ctx.lineTo(x, yP);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(x - 4, yP);
+                ctx.lineTo(x + 4, yP);
+                ctx.stroke();
+            }
+        }
+
+        // x labels (thin)
+        ctx.fillStyle = '#718096';
+        ctx.textAlign = 'center';
+        const step = labels.length <= 7 ? 1 : (labels.length <= 14 ? 2 : Math.ceil(labels.length / 7));
+        for (let i = 0; i < labels.length; i++) {
+            if (i % step === 0 || i === labels.length - 1) {
+                ctx.fillText(labels[i], xOf(i), H - 6);
+            }
+        }
         }
 
 
         // Rendering
-        function renderToday(data) {
+        */ function renderToday(data) {
             if (!data) {
                 console.warn('[renderToday] No data provided');
                 return;
@@ -1647,10 +2116,14 @@
             const totalLen = rows.length;
 
             rows.forEach((row, i) => {
+
+                if (i === 0) console.log("COMPARE row keys:", Object.keys(row));
+
                 // Correct chart index calculation
                 const chartIndex = (totalLen - 1) - i;
 
                 // Safe Extraction
+
                 const time = row.slotLabel || row.slotStart_1h || row.slotStart || "--:--";
                 const pm25 = getNum(row, ['pm25_median', 'pm25_med', 'pm25_median_1h']);
                 const pm25max = getNum(row, ['pm25_max']);
@@ -1659,6 +2132,58 @@
 
                 const delta25 = getNum(row, ['delta_pm25_med', 'delta_vs_prev']);
                 const delta10 = getNum(row, ['delta_pm10_med']);
+
+                /*
+                // Safe Extraction
+                const time = row.slotLabel || row.slotStart_1h || row.slotStart || "--:--";
+
+                // ★ PM2.5（キーゆれ吸収）
+                const pm25 = getNum(row, [
+                    'pm25_now',        // ← あなたのGASにある可能性大
+                    'pm25_10m_med',    // ← あなたのGASにある可能性大
+                    'pm25_median',
+                    'pm25_med',
+                    'pm25_median_1h'
+                ]);
+
+                const pm25max = getNum(row, [
+                    'pm25_now_max',
+                    'pm25_10m_max',
+                    'pm25_max'
+                ]);
+
+                // ★ PM10
+                const pm10 = getNum(row, [
+                    'pm10_now',
+                    'pm10_10m_med',
+                    'pm10_median',
+                    'pm10_med'
+                ]);
+
+                const pm10max = getNum(row, [
+                    'pm10_now_max',
+                    'pm10_10m_max',
+                    'pm10_max'
+                ]);
+
+                // ★ Δ
+                const delta25 = getNum(row, [
+                    'delta_vs_2h',
+                    'delta_vs_1h',
+                    'delta_pm25_med',
+                    'delta_vs_prev'
+                ]);
+
+                const delta10 = getNum(row, [
+                    'delta_pm10_med'
+                ]);
+
+                if (i === 0) {
+                    console.log("delta25 raw:", row.delta_pm25_med, "picked:", delta25, "parsed:", toFiniteNumber(delta25));
+                    console.log("delta10 raw:", row.delta_pm10_med, "picked:", delta10, "parsed:", toFiniteNumber(delta10));
+                }
+                */
+
 
                 const shape = row.shape_label || row.shape || "";
 
